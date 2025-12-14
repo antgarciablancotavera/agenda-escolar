@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Agenda Docente V6.1</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f0f2f5; padding-bottom: 80px; }
+        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; border-radius: 12px; }
+        .nav-link { cursor: pointer; font-weight: 600; }
+        
+        /* TARJETA DE CLASE */
+        .class-entry-card {
+            border: 1px solid #e2e8f0;
+            border-left: 6px solid #0d6efd;
+            background: #fff;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .class-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
+        .class-title { font-weight: 800; color: #1e293b; font-size: 1.1em; }
+        .hour-badge { background: #e0f2fe; color: #0284c7; padding: 4px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; }
+        
+        /* CAJAS DE TEXTO */
+        textarea.form-control { font-size: 16px; } 
+        .box-log { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+        .label-log { color: #334155; font-weight: bold; font-size: 0.85rem; display: block; margin-bottom: 5px; }
+        .box-plan { background-color: #fffbeb; border: 2px solid #fcd34d; padding: 12px; border-radius: 8px; }
+        .label-plan { color: #b45309; font-weight: bold; font-size: 0.8rem; display: block; margin-bottom: 5px; text-transform: uppercase; }
+        .next-date-badge { float: right; background: #fef3c7; color: #d97706; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; }
+
+        /* TABLA HORARIO */
+        .schedule-input { border: none; background: transparent; width: 100%; text-align: center; padding: 8px 0; font-size: 14px; }
+        .schedule-input:focus { outline: 2px solid #3b82f6; background: #fff; border-radius: 4px; }
+        .table-schedule th { background-color: #0f172a; color: white; text-align: center; font-size: 0.9em; }
+        
+        /* ALERTAS Y UI */
+        .alert-urgent { border-left: 5px solid #ef4444; background-color: #fef2f2; color: #991b1b; padding: 10px; font-size: 0.9em; }
+        #autoSaveIndicator {
+            position: fixed; bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.7); color: white;
+            padding: 8px 16px; border-radius: 20px;
+            font-size: 0.8em; z-index: 9999;
+            opacity: 0; transition: opacity 0.5s; pointer-events: none;
+        }
+    </style>
+ <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#"><i class="fas fa-graduation-cap"></i> Agenda</a>
+        <div class="d-flex align-items-center">
+            <!-- Botón Cargar -->
+            <button class="btn btn-outline-light btn-sm me-1" onclick="document.getElementById('fileInput').click()" title="Restaurar copia">
+                <i class="fas fa-upload"></i>
+            </button>
+            <input type="file" id="fileInput" style="display: none;" accept=".json" onchange="loadDataFile(this)">
+            
+            <!-- Botón Guardar -->
+            <button class="btn btn-light btn-sm text-primary fw-bold me-2" onclick="openSaveModal()" title="Crear copia seguridad">
+                <i class="fas fa-download"></i>
+            </button>
+
+            <!-- NUEVO: Botón Configuración / Reset -->
+            <button class="btn btn-dark btn-sm border-white" onclick="openSettingsModal()" title="Configuración y Borrado">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-3">
+    <div id="alertsPanel"></div>
+
+    <ul class="nav nav-pills nav-fill mb-3" id="myTab" role="tablist">
+        <li class="nav-item"><a class="nav-link active" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda" type="button"><i class="fas fa-list-alt"></i> Diario</a></li>
+        <li class="nav-item"><a class="nav-link" id="horario-tab" data-bs-toggle="tab" data-bs-target="#horario" type="button"><i class="fas fa-calendar-week"></i> Horario</a></li>
+        <li class="nav-item"><a class="nav-link" id="informes-tab" data-bs-toggle="tab" data-bs-target="#informes" type="button"><i class="fas fa-chart-bar"></i> Hist.</a></li>
+        <li class="nav-item"><a class="nav-link" id="tareas-tab" data-bs-toggle="tab" data-bs-target="#tareas" type="button"><i class="fas fa-check-square"></i> Tareas</a></li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- AGENDA -->
+        <div class="tab-pane fade show active" id="agenda">
+            <div class="row">
+                <div class="col-lg-9 mx-auto">
+                    <div class="card p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="goToToday()">Hoy</button>
+                            <input type="date" id="dayPicker" class="form-control fw-bold mx-2" style="max-width: 150px;" onchange="renderDailyForm()">
+                        </div>
+                        <div id="dynamicFormContainer"></div>
+                        <div class="d-grid gap-2 mt-3">
+                            <button class="btn btn-primary shadow" onclick="saveData()">
+                                <i class="fas fa-sync-alt me-2"></i> ACTUALIZAR Y PLANIFICAR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HORARIO -->
+        <div class="tab-pane fade" id="horario">
+            <div class="card p-2">
+                <div class="alert alert-secondary py-2 small"><i class="fas fa-info-circle"></i> Escribe tus asignaturas.</div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-schedule mb-0">
+                        <thead><tr><th style="width:10%">H</th><th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th></tr></thead>
+                        <tbody id="scheduleBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- INFORMES -->
+        <div class="tab-pane fade" id="informes">
+            <div class="card p-3">
+                <h5 class="mb-3">Historial</h5>
+                <div class="row g-2 mb-3 bg-light p-2 rounded">
+                    <div class="col-12"><select id="reportSubject" class="form-select"><option value="">-- Asignatura --</option></select></div>
+                    <div class="col-6"><input type="date" id="reportStart" class="form-control form-control-sm"></div>
+                    <div class="col-6"><input type="date" id="reportEnd" class="form-control form-control-sm"></div>
+                    <div class="col-12"><button class="btn btn-primary w-100 btn-sm" onclick="generateReport()">Buscar</button></div>
+                </div>
+                <div id="reportResults"></div>
+            </div>
+        </div>
+
+        <!-- TAREAS -->
+        <div class="tab-pane fade" id="tareas">
+            <div class="card p-3 mb-3">
+                <h5>Nueva Tarea</h5>
+                <div class="row g-2">
+                    <div class="col-12"><input type="text" class="form-control" id="taskTitle" placeholder="Título tarea"></div>
+                    <div class="col-6"><input type="date" class="form-control" id="taskDate"></div>
+                    <div class="col-6"><select class="form-select" id="taskType"><option>Examen</option><option>Admin</option><option>Personal</option></select></div>
+                    <div class="col-12"><input type="number" class="form-control" id="taskAlertOverride" placeholder="Días aviso (Def: 2)"></div>
+                    <div class="col-12"><button class="btn btn-primary w-100" onclick="addTask()">Añadir</button></div>
+                </div>
+            </div>
+            <div class="card p-0">
+                <ul class="list-group list-group-flush" id="taskList"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="autoSaveIndicator"><i class="fas fa-save"></i> Guardado</div>
+
+<!-- Modal Backup (Descargar) -->
+<div class="modal fade" id="saveFileModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Copia de Seguridad</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="small text-muted">Descarga un archivo para mover tus datos a otro dispositivo.</p>
+                <div class="input-group"><input type="text" class="form-control" id="saveFileName" value="agenda_backup"><span class="input-group-text">.json</span></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success w-100" onclick="confirmSaveFile()">Descargar Archivo</button></div>
+        </div>
+    </div>
+</div>
+
+<!-- NUEVO: Modal Settings / Reset -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Gestión de Datos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Aquí puedes borrar toda la memoria de la aplicación para empezar desde cero.</p>
+                <div class="alert alert-warning small">
+                    <strong>¡Atención!</strong> Esta acción borrará todas las clases, horarios y tareas guardadas en este dispositivo.
+                </div>
+                <p class="small text-muted">Te recomendamos descargar una copia de seguridad antes de borrar.</p>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="hardReset()">
+                    <i class="fas fa-trash-alt"></i> BORRAR TODO
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // --- CLAVE LOCALSTORAGE ---
+    const DB_KEY = 'agenda_docente_db_v6';
+    let appData = { logs: [], plans: [], tasks: [], schedule: [] };
+
+    // --- INTEGRIDAD Y CARGA ---
+    function ensureData() {
+        if(!appData.logs) appData.logs = [];
+        if(!appData.plans) appData.plans = [];
+        if(!appData.tasks) appData.tasks = [];
+        if(!appData.schedule || appData.schedule.length === 0) {
+            appData.schedule = []; for(let i=0;i<7;i++) appData.schedule.push(["","","","",""]);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const localDB = localStorage.getItem(DB_KEY);
+        if (localDB) {
+            try { appData = JSON.parse(localDB); } catch (e) { console.error("Error DB", e); }
+        }
+        ensureData();
+        goToToday(); renderSchedule(); renderTasks(); checkAlerts();
+
+        const tabAgenda = document.getElementById('agenda-tab');
+        const tabInformes = document.getElementById('informes-tab');
+        if(tabAgenda) tabAgenda.addEventListener('shown.bs.tab', renderDailyForm);
+        if(tabInformes) tabInformes.addEventListener('shown.bs.tab', populateSubjectSelect);
+        
+        populateSubjectSelect(); renderDailyForm();
+    });
+
+    // --- FUNCIONES DEL SISTEMA ---
+    function autoSave() { localStorage.setItem(DB_KEY, JSON.stringify(appData)); showSaveIndicator(); }
+    function showSaveIndicator() {
+        const ind = document.getElementById('autoSaveIndicator');
+        ind.style.opacity = '1'; setTimeout(() => { ind.style.opacity = '0'; }, 1500);
+    }
+    
+    // NUEVO: BORRADO TOTAL
+    function openSettingsModal() { new bootstrap.Modal(document.getElementById('settingsModal')).show(); }
+    function hardReset() {
+        if(confirm("¿ESTÁS SEGURO? Se borrarán todos los datos permanentemente.")) {
+            if(confirm("Última advertencia: Esta acción es irreversible. ¿Borrar todo?")) {
+                localStorage.removeItem(DB_KEY);
+                location.reload(); // Recarga la página para reiniciar limpio
+            }
+        }
+    }
+
+    // --- AGENDA ---
+    function goToToday() { document.getElementById('dayPicker').valueAsDate = new Date(); renderDailyForm(); }
+
+    function renderDailyForm() {
+        ensureData();
+        const container = document.getElementById('dynamicFormContainer');
+        container.innerHTML = "";
+        
+        const dateInput = document.getElementById('dayPicker').value;
+        if (!dateInput) return;
+
+        const dateObj = new Date(dateInput);
+        const dayOfWeek = dateObj.getDay(); 
+        
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            container.innerHTML = `<div class="alert alert-secondary text-center py-4"><h4>☕ Fin de Semana</h4><p>Descanso.</p></div>`;
+        } else {
+            const scheduleIndex = dayOfWeek - 1;
+            let classesFound = false;
+
+            appData.schedule.forEach((row, hourIndex) => {
+                const subject = row[scheduleIndex];
+                if (subject && subject.trim() !== "") {
+                    classesFound = true;
+                    
+                    const existingLog = getLogContent(dateInput, subject);
+                    const incomingPlan = getPlanContent(dateInput, subject);
+                    
+                    let greyBoxValue = existingLog;
+                    let placeholderLog = "Registro de clase...";
+                    let isAutoFilled = false;
+                    
+                    if (!existingLog && incomingPlan) {
+                        greyBoxValue = incomingPlan;
+                        isAutoFilled = true;
+                    }
+
+                    const nextDate = findNextClassDate(dateInput, subject);
+                    let yellowBoxValue = "";
+                    let nextDateLabel = "---";
+
+                    if (nextDate) {
+                        yellowBoxValue = getPlanContent(nextDate, subject);
+                        nextDateLabel = formatDate(nextDate);
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = "class-entry-card";
+                    const uniqueId = `class-${hourIndex}`;
+                    
+                    div.innerHTML = `
+                        <div class="class-header" id="${uniqueId}">
+                            <div><span class="hour-badge">${hourIndex + 1}ª</span><span class="class-title ms-2">${subject}</span></div>
+                            <button class="btn btn-sm btn-outline-warning" onclick="manualBump('${uniqueId}')">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                        <div class="box-log">
+                            <label class="label-log"><i class="fas fa-check"></i> HOY:</label>
+                            <textarea class="form-control daily-log-input" data-subject="${subject}" rows="3" placeholder="${placeholderLog}">${greyBoxValue}</textarea>
+                            ${isAutoFilled ? '<small class="text-primary" style="font-size:0.7em">Autocompletado</small>' : ''}
+                        </div>
+                        <div class="box-plan">
+                            <span class="next-date-badge">Para: ${nextDateLabel}</span>
+                            <label class="label-plan">PRÓXIMO:</label>
+                            <textarea class="form-control next-day-input" data-subject="${subject}" data-next-date="${nextDate || ''}" rows="3" placeholder="Planificación...">${yellowBoxValue}</textarea>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                }
+            });
+            if (!classesFound) container.innerHTML = `<div class="alert alert-warning text-center">Horario vacío hoy.</div>`;
+        }
+        renderPersonalNote(container, dateInput);
+    }
+
+    function manualBump(cardId) {
+        const card = document.getElementById(cardId).parentElement;
+        const grayInput = card.querySelector('.daily-log-input');
+        const yellowInput = card.querySelector('.next-day-input');
+
+        if(grayInput.value.trim() === "") return;
+        if(confirm("¿Mover texto a la planificación futura?")) {
+            const currentYellow = yellowInput.value.trim();
+            const textToMove = grayInput.value.trim();
+            yellowInput.value = currentYellow ? currentYellow + "\n[Pospuesto]: " + textToMove : textToMove;
+            grayInput.value = "";
+            saveData();
+        }
+    }
+
+    function renderPersonalNote(container, dateInput) {
+        const log = getLogContent(dateInput, "Personal");
+        const nextDate = getNextDay(dateInput);
+        const plan = getPlanContent(nextDate, "Personal");
+        
+        const div = document.createElement('div');
+        div.className = "class-entry-card";
+        div.style.borderLeftColor = "#198754";
+        div.innerHTML = `
+            <div class="class-header"><span class="class-title text-success"><i class="fas fa-sticky-note"></i> Personal</span></div>
+            <div class="box-log">
+                <label class="label-log text-success">Hoy:</label>
+                <textarea class="form-control daily-log-input" data-subject="Personal" rows="2">${log || getPlanContent(dateInput, "Personal")}</textarea>
+            </div>
+            <div class="box-plan" style="background-color: #e8f5e9; border-color: #c8e6c9;">
+                <label class="label-plan text-success">Mañana:</label>
+                <textarea class="form-control next-day-input" data-subject="Personal" data-next-date="${nextDate}" rows="2">${plan}</textarea>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    function saveData() {
+        ensureData();
+        const dateStr = document.getElementById('dayPicker').value;
+        const logInputs = document.querySelectorAll('.daily-log-input');
+        const nextInputs = document.querySelectorAll('.next-day-input');
+
+        appData.logs = appData.logs.filter(l => l.date !== dateStr);
+        logInputs.forEach(input => {
+            const val = input.value.trim();
+            if (val) appData.logs.push({ date: dateStr, subject: input.dataset.subject, content: val });
+        });
+
+        appData.plans = appData.plans.filter(p => p.date !== dateStr);
+        nextInputs.forEach(input => {
+            const subject = input.dataset.subject;
+            const nextDate = input.dataset.nextDate;
+            const content = input.value.trim();
+            if (content) {
+                appData.plans.push({ date: dateStr, subject: subject, content: content });
+                if (subject !== "Personal" && nextDate) {
+                    const nextDateStr = nextDate; 
+                    appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
+                    appData.plans.push({ date: nextDateStr, subject: subject, content: content });
+                }
+            }
+        });
+        autoSave(); renderDailyForm(); alert("Guardado en el dispositivo.");
+    }
+
+    // --- HORARIO ---
+    function renderSchedule() {
+        const tbody = document.getElementById('scheduleBody'); tbody.innerHTML = "";
+        appData.schedule.forEach((row, r) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td class="table-light fw-bold text-center p-0 align-middle">${r + 1}ª</td>`;
+            row.forEach((cell, c) => {
+                const td = document.createElement('td');
+                const inp = document.createElement('input');
+                inp.className = "schedule-input"; inp.value = cell; inp.placeholder = "-";
+                inp.onchange = (e) => { appData.schedule[r][c] = e.target.value; autoSave(); };
+                td.appendChild(inp); tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- TAREAS ---
+    function addTask() {
+        const title = document.getElementById('taskTitle').value; 
+        const date = document.getElementById('taskDate').value;
+        const alertOverride = document.getElementById('taskAlertOverride').value; 
+        if(!title || !date) return alert("Faltan datos");
+        appData.tasks.push({ id: Date.now(), title, date, type: document.getElementById('taskType').value, alertOverride: alertOverride, done: false });
+        document.getElementById('taskTitle').value = ""; renderTasks(); checkAlerts(); autoSave();
+    }
+    function toggleTask(id) { const t=appData.tasks.find(x=>x.id===id); if(t) { t.done=!t.done; renderTasks(); checkAlerts(); autoSave(); } }
+    function deleteTask(id) { if(confirm("¿Borrar?")) { appData.tasks=appData.tasks.filter(x=>x.id!==id); renderTasks(); checkAlerts(); autoSave(); } }
+    
+    // --- UTILS ---
+    function findNextClassDate(startDateStr, subject) {
+        let current = new Date(startDateStr); current.setDate(current.getDate() + 1);
+        for (let i = 0; i < 40; i++) { 
+            const dayIdx = current.getDay();
+            if (dayIdx !== 0 && dayIdx !== 6) {
+                const colIdx = dayIdx - 1;
+                const hasClass = appData.schedule.some(row => row[colIdx] === subject);
+                if (hasClass) return current.toISOString().slice(0,10);
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return null;
+    }
+    function getNextDay(dateStr) { let d = new Date(dateStr); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }
+    function formatDate(dateStr) { const parts = dateStr.split('-'); return `${parts[2]}/${parts[1]}`; }
+    function getLogContent(date, subject) { if(!appData.logs) return ""; const f = appData.logs.find(l => l.date === date && l.subject === subject); return f ? f.content : ""; }
+    function getPlanContent(date, subject) { if(!appData.plans) return ""; const f = appData.plans.find(p => p.date === date && p.subject === subject); return f ? f.content : ""; }
+
+    function renderTasks() {
+        const list = document.getElementById('taskList'); list.innerHTML = "";
+        [...appData.tasks].sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(t => {
+            list.innerHTML += `<li class="list-group-item d-flex justify-content-between p-2 ${t.done?'bg-light text-decoration-line-through':''}"><div><input class="form-check-input me-2" type="checkbox" ${t.done?'checked':''} onchange="toggleTask(${t.id})"><small><strong>${t.date}</strong>: ${t.title}</small></div><button class="btn btn-sm text-danger p-0 ms-2" onclick="deleteTask(${t.id})"><i class="fas fa-trash"></i></button></li>`;
+        });
+    }
+
+    function checkAlerts() {
+        const panel = document.getElementById('alertsPanel'); panel.innerHTML = "";
+        const today = new Date(); today.setHours(0,0,0,0);
+        appData.tasks.forEach(t => {
+            if(!t.done) {
+                const diff = Math.ceil((new Date(t.date)-today)/(86400000));
+                const thr = t.alertOverride ? parseInt(t.alertOverride) : 2;
+                if(diff>=0 && diff<=thr) panel.innerHTML += `<div class="alert alert-urgent mb-2 py-2"><i class="fas fa-bell"></i> <strong>${t.title}</strong> vence en ${diff} días.</div>`;
+            }
+        });
+    }
+
+    function populateSubjectSelect() {
+        const select = document.getElementById('reportSubject');
+        const subjects = new Set();
+        if(appData.schedule) appData.schedule.forEach(row => { row.forEach(cell => { if (cell && cell.trim()) subjects.add(cell.trim()); }); });
+        subjects.add("Personal");
+        select.innerHTML = '<option value="">-- Selecciona --</option>';
+        subjects.forEach(subj => { const o = document.createElement('option'); o.value = subj; o.textContent = subj; select.appendChild(o); });
+    }
+
+    function generateReport() {
+        const subj = document.getElementById('reportSubject').value;
+        const start = document.getElementById('reportStart').value;
+        const end = document.getElementById('reportEnd').value;
+        if(!subj) return alert("Selecciona asignatura.");
+        let res = appData.logs.filter(l => l.subject === subj);
+        if(start) res = res.filter(l => l.date >= start);
+        if(end) res = res.filter(l => l.date <= end);
+        res.sort((a,b) => new Date(b.date)-new Date(a.date));
+        
+        const div = document.getElementById('reportResults');
+        if(res.length===0) return div.innerHTML = '<div class="alert alert-info py-2">Sin registros.</div>';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-sm"><thead><tr class="table-light"><th>Fecha</th><th>Actividad</th></tr></thead><tbody>';
+        res.forEach(r => html += `<tr><td class="fw-bold" style="font-size:0.9em">${r.date}</td><td style="font-size:0.9em">${r.content}</td></tr>`);
+        div.innerHTML = html + '</tbody></table></div>';
+    }
+
+    function openSaveModal() { new bootstrap.Modal(document.getElementById('saveFileModal')).show(); }
+    function confirmSaveFile() {
+        const name = document.getElementById('saveFileName').value || "agenda";
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(appData,null,2)], {type:"application/json"}));
+        a.download = name + '.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        bootstrap.Modal.getInstance(document.getElementById('saveFileModal')).hide();
+    }
+    function loadDataFile(input) {
+        const r = new FileReader();
+        r.onload = e => { try { appData = JSON.parse(e.target.result); ensureData(); autoSave(); location.reload(); } catch(e){alert("Error archivo");} };
+        if(input.files[0]) r.readAsText(input.files[0]);
+    }
+</script>
+</body>
+</html>
