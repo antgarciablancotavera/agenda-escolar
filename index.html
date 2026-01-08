@@ -362,38 +362,34 @@
         const logInputs = document.querySelectorAll('.daily-log-input');
         const nextInputs = document.querySelectorAll('.next-day-input');
 
-        // Guardar logs (Cajas grises / HOY)
+        // Guardar logs (Cajas grises)
         appData.logs = appData.logs.filter(l => l.date !== dateStr);
         logInputs.forEach(input => {
             const val = input.value.trim();
             if (val) appData.logs.push({ date: dateStr, subject: input.dataset.subject, content: val });
         });
 
-        // Guardar planificación (Cajas amarillas / PRÓXIMO)
-        appData.plans = appData.plans.filter(p => p.date !== dateStr); // Limpia planes del día actual
+        // Guardar planificación (Cajas amarillas)
+        // 1. Limpiamos TODA la planificación de HOY primero
+        appData.plans = appData.plans.filter(p => p.date !== dateStr); 
 
         nextInputs.forEach(input => {
             const subject = input.dataset.subject;
             const nextDate = input.dataset.nextDate;
             const content = input.value.trim();
-
+            
             if (content) {
-                // 1. SIEMPRE guardar en el PLAN del día ACTUAL (para que no desaparezca de la caja amarilla)
-                appData.plans.push({ date: dateStr, subject: subject, content: content });
-
-                // 2. Gestionar la proyección al FUTURO
+                // MODIFICACION: Si NO es Personal, guardamos también en HOY (registro del profesor).
+                // Si ES Personal, nos lo saltamos para que desaparezca de hoy.
+                if (subject !== 'Personal') {
+                    appData.plans.push({ date: dateStr, subject: subject, content: content });
+                }
+                
+                // Guardar en el día de destino (siempre que haya fecha futura)
                 if (nextDate) {
-                    if (subject === 'Personal') {
-                        // CASO PERSONAL: Se guarda en el LOG (Hoy) del día SIGUIENTE
-                        // Eliminamos duplicados para evitar problemas
-                        appData.logs = appData.logs.filter(l => !(l.date === nextDate && l.subject === 'Personal'));
-                        appData.logs.push({ date: nextDate, subject: 'Personal', content: content });
-                    } else {
-                        // CASO ASIGNATURAS: Se guarda en el PLAN (Mañana) del día SIGUIENTE (Próxima clase)
-                        const nextDateStr = nextDate;
-                        appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
-                        appData.plans.push({ date: nextDateStr, subject: subject, content: content });
-                    }
+                    const nextDateStr = nextDate; 
+                    appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
+                    appData.plans.push({ date: nextDateStr, subject: subject, content: content });
                 }
             }
         });
