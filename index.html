@@ -378,17 +378,18 @@
             const content = input.value.trim();
 
             if (content) {
-                // 1. SIEMPRE guardar en el plan de HOY (para que no desaparezca de la caja amarilla)
+                // 1. SIEMPRE guardar en el PLAN de HOY (Para que no desaparezca de la caja amarilla)
                 appData.plans.push({ date: dateStr, subject: subject, content: content });
 
-                // 2. Gestionar la proyección al FUTURO
+                // 2. Gestionar la proyección al día siguiente
                 if (nextDate) {
                     if (subject === 'Personal') {
-                        // CASO PERSONAL: Se proyecta al LOG del futuro (caja verde mañana)
+                        // CASO PERSONAL: Se copia al LOG (Caja gris) del día siguiente.
+                        // Y NO se copia al PLAN del día siguiente.
                         appData.logs = appData.logs.filter(l => !(l.date === nextDate && l.subject === 'Personal'));
                         appData.logs.push({ date: nextDate, subject: 'Personal', content: content });
                     } else {
-                        // CASO ASIGNATURA: Se proyecta al PLAN del futuro (caja amarilla mañana)
+                        // CASO NORMAL: Se copia al PLAN (Caja amarilla) del día siguiente.
                         const nextDateStr = nextDate;
                         appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
                         appData.plans.push({ date: nextDateStr, subject: subject, content: content });
