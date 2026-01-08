@@ -378,19 +378,17 @@
             const content = input.value.trim();
 
             if (content) {
-                if (subject === 'Personal') {
-                    // CASO PERSONAL: Guardar directamente en el LOG del día siguiente.
-                    // Esto hace que aparezca en el día siguiente como registro final, 
-                    // y desaparezca de la caja de planificación del día actual (porque no lo guardamos en 'plans').
-                    if (nextDate) {
-                        // Limpiar log existente en el futuro para evitar duplicados al pulsar guardar varias veces
+                // 1. SIEMPRE guardar en el plan de HOY (para que no desaparezca de la caja amarilla)
+                appData.plans.push({ date: dateStr, subject: subject, content: content });
+
+                // 2. Gestionar la proyección al FUTURO
+                if (nextDate) {
+                    if (subject === 'Personal') {
+                        // CASO PERSONAL: Se proyecta al LOG del futuro (caja verde mañana)
                         appData.logs = appData.logs.filter(l => !(l.date === nextDate && l.subject === 'Personal'));
                         appData.logs.push({ date: nextDate, subject: 'Personal', content: content });
-                    }
-                } else {
-                    // CASO NORMAL (ASIGNATURAS): Guardar como Planificación en ambos días.
-                    appData.plans.push({ date: dateStr, subject: subject, content: content });
-                    if (nextDate) {
+                    } else {
+                        // CASO ASIGNATURA: Se proyecta al PLAN del futuro (caja amarilla mañana)
                         const nextDateStr = nextDate;
                         appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
                         appData.plans.push({ date: nextDateStr, subject: subject, content: content });
