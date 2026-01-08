@@ -375,7 +375,7 @@
             const content = input.value.trim();
             if (content) {
                 appData.plans.push({ date: dateStr, subject: subject, content: content });
-                if (subject !== "Personal" && nextDate) {
+                if (nextDate) {
                     const nextDateStr = nextDate; 
                     appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
                     appData.plans.push({ date: nextDateStr, subject: subject, content: content });
