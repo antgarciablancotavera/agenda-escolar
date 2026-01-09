@@ -362,37 +362,33 @@
         const logInputs = document.querySelectorAll('.daily-log-input');
         const nextInputs = document.querySelectorAll('.next-day-input');
 
-        // Guardar logs (Cajas grises)
+        // 1. Logs (Cajas grises): Borramos y reescribimos lo de HOY
         appData.logs = appData.logs.filter(l => l.date !== dateStr);
         logInputs.forEach(input => {
             const val = input.value.trim();
             if (val) appData.logs.push({ date: dateStr, subject: input.dataset.subject, content: val });
         });
 
-        // Guardar planificación (Cajas amarillas)
-        // 1. Limpiamos TODA la planificación de HOY primero
-        appData.plans = appData.plans.filter(p => p.date !== dateStr); 
-
+        // 2. Planificación (Cajas amarillas):
+        // NO borramos todo 'dateStr'. Borramos selectivamente basado en la 'nextDate' de cada input.
+        // Así respetamos lo que se hubiera escrito en días anteriores que apuntaba a hoy.
+        
         nextInputs.forEach(input => {
             const subject = input.dataset.subject;
             const nextDate = input.dataset.nextDate;
             const content = input.value.trim();
             
-            if (content) {
-                // MODIFICACION: Si NO es Personal, guardamos también en HOY (registro del profesor).
-                // Si ES Personal, nos lo saltamos para que desaparezca de hoy.
-                if (subject !== 'Personal') {
-                    appData.plans.push({ date: dateStr, subject: subject, content: content });
-                }
+            if (nextDate) {
+                // Borramos solo la planificación para esa fecha futura y esa asignatura específica
+                appData.plans = appData.plans.filter(p => !(p.date === nextDate && p.subject === subject));
                 
-                // Guardar en el día de destino (siempre que haya fecha futura)
-                if (nextDate) {
-                    const nextDateStr = nextDate; 
-                    appData.plans = appData.plans.filter(p => !(p.date === nextDateStr && p.subject === subject));
-                    appData.plans.push({ date: nextDateStr, subject: subject, content: content });
+                // Si hay contenido, insertamos el nuevo plan
+                if (content) {
+                    appData.plans.push({ date: nextDate, subject: subject, content: content });
                 }
             }
         });
+        
         autoSave(); renderDailyForm(); alert("Guardado en el dispositivo.");
     }
 
